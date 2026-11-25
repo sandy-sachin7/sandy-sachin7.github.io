@@ -2,8 +2,9 @@
 """
 Zero-dependency static site generator for sandy-sachin7.github.io.
 
-Reads Markdown essays with YAML-like frontmatter from `content/posts/*.md`
-and builds `dist/` (HTML pages, Atom feed, sitemap, robots.txt, and assets).
+Reads Markdown posts (personal essays, prose, general writing, and engineering notes)
+from `content/posts/*.md` and builds `dist/` (HTML pages, Atom feed, sitemap,
+robots.txt, and assets).
 
 Usage:
     python3 build.py
@@ -26,9 +27,26 @@ DIST_DIR = ROOT / "dist"
 SITE_URL = "https://sandy-sachin7.github.io"
 SITE_TITLE = "Santhosh Sachin"
 SITE_DESC = (
-    "Systems engineering notes, Rust storage tools, local-first AI infrastructure, "
-    "and reproducible benchmarks by Santhosh Sachin."
+    "Personal essays, prose, general writing, and software notes by Santhosh Sachin."
 )
+
+LITERARY_KINDS = {
+    "personal",
+    "prose",
+    "essay",
+    "essays",
+    "fiction",
+    "story",
+    "poetry",
+    "poem",
+    "journal",
+    "reflection",
+    "reflections",
+    "letters",
+    "general",
+    "culture",
+    "books",
+}
 
 FONTS_LINK = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
@@ -44,10 +62,16 @@ class Post:
     title: str
     slug: str
     date: str
+    kind: str
+    style: str
     tags: list[str]
     summary: str
     read_time: str
+    location: str
+    epigraph: str
+    excerpt: str
     metric: str
+    metric_label: str
     metric_note: str
     repo_url: str
     featured: bool
@@ -55,6 +79,23 @@ class Post:
     poster_alt: str
     body_md: str
     body_html: str
+
+    @property
+    def is_literary(self) -> bool:
+        if self.style:
+            return self.style.lower() in {"serif", "literary", "prose"}
+        return self.kind.lower() in LITERARY_KINDS
+
+    @property
+    def filter_terms(self) -> list[str]:
+        terms: list[str] = []
+        seen: set[str] = set()
+        for item in ([self.kind] if self.kind else []) + self.tags:
+            key = item.strip().lower()
+            if key and key not in seen:
+                seen.add(key)
+                terms.append(item.strip())
+        return terms
 
 
 def parse_frontmatter(raw: str) -> tuple[dict[str, str], str]:
@@ -69,6 +110,14 @@ def parse_frontmatter(raw: str) -> tuple[dict[str, str], str]:
         k, _, v = line.partition(":")
         meta[k.strip()] = v.strip().strip('"').strip("'")
     return meta, body
+
+
+def estimate_read_time(md: str) -> str:
+    plain = re.sub(r"```.*?```", " ", md, flags=re.DOTALL)
+    plain = re.sub(r"<[^>]+>", " ", plain)
+    words = len(re.findall(r"\b\w+\b", plain))
+    mins = max(1, round(words / 220))
+    return f"{mins} min"
 
 
 def render_inline(text: str) -> str:
@@ -87,13 +136,33 @@ def render_inline(text: str) -> str:
         r'<a href="\2">\1</a>',
         text,
     )
-    # Bold & italic
+    # Strikethrough, bold, italic
+    text = re.sub(r"~~([^~]+)~~", r"<del>\1</del>", text)
     text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"\*([^*]+)\*", r"<em>\1</em>", text)
+    text = re.sub(r"(?<!\w)_([^_\n]+)_(?!\w)", r"<em>\1</em>", text)
 
     for idx, token in enumerate(code_tokens):
         text = text.replace(f"\x00CODE{idx}\x00", token)
     return text
+
+
+def render_verse_block(lines: list[str]) -> str:
+    stanzas: list[list[str]] = []
+    cur: list[str] = []
+    for raw_line in lines:
+        if not raw_line.strip():
+            if cur:
+                stanzas.append(cur)
+                cur = []
+        else:
+            lead = len(raw_line) - len(raw_line.lstrip(" "))
+            prefix = "&nbsp;" * lead
+            cur.append(prefix + render_inline(raw_line.lstrip(" ")))
+    if cur:
+        stanzas.append(cur)
+    stanza_html = "".join(f"<p>{'<br>'.join(stanza)}</p>" for stanza in stanzas)
+    return f'<div class="verse">{stanza_html}</div>'
 
 
 def render_markdown(md: str) -> str:
@@ -125,23 +194,32 @@ def render_markdown(md: str) -> str:
             out.append("\n".join(html_lines))
             continue
 
-        # Fenced code block
+        # Scene break / thematic horizontal rule (---, ***, * * *)
+        if re.match(r"^(?:-{3,}|\*{3,}|(?:\*\s+){2,}\*)$", stripped):
+            out.append('<hr class="scene-break" aria-hidden="true">')
+            i += 1
+            continue
+
+        # Fenced block (code or verse/poem)
         if stripped.startswith("```"):
-            lang = stripped[3:].strip()
-            code_lines: list[str] = []
+            lang = stripped[3:].strip().lower()
+            block_lines: list[str] = []
             i += 1
             while i < n and not lines[i].strip().startswith("```"):
-                code_lines.append(lines[i])
+                block_lines.append(lines[i])
                 i += 1
             i += 1
-            cls = f' class="language-{html.escape(lang)}"' if lang else ""
-            code_escaped = html.escape("\n".join(code_lines))
-            out.append(
-                '<div class="code-block">'
-                '<button type="button" class="copy-btn" aria-label="Copy code snippet">Copy</button>'
-                f"<pre><code{cls}>{code_escaped}</code></pre>"
-                "</div>"
-            )
+            if lang in {"verse", "poem", "poetry"}:
+                out.append(render_verse_block(block_lines))
+            else:
+                cls = f' class="language-{html.escape(lang)}"' if lang else ""
+                code_escaped = html.escape("\n".join(block_lines))
+                out.append(
+                    '<div class="code-block">'
+                    '<button type="button" class="copy-btn" aria-label="Copy code snippet">Copy</button>'
+                    f"<pre><code{cls}>{code_escaped}</code></pre>"
+                    "</div>"
+                )
             continue
 
         # Headings
@@ -158,13 +236,21 @@ def render_markdown(md: str) -> str:
             i += 1
             continue
 
-        # Blockquote
-        if stripped.startswith("> "):
-            q_lines: list[str] = []
-            while i < n and lines[i].strip().startswith("> "):
-                q_lines.append(lines[i].strip()[2:])
+        # Blockquote (supports multiple paragraphs separated by bare `>`)
+        if stripped.startswith(">"):
+            q_paras: list[list[str]] = [[]]
+            while i < n and lines[i].strip().startswith(">"):
+                q_line = lines[i].strip()[1:].strip()
+                if not q_line:
+                    if q_paras[-1]:
+                        q_paras.append([])
+                else:
+                    q_paras[-1].append(q_line)
                 i += 1
-            out.append(f"<blockquote><p>{render_inline(' '.join(q_lines))}</p></blockquote>")
+            p_html = "".join(
+                f"<p>{render_inline(' '.join(p))}</p>" for p in q_paras if p
+            )
+            out.append(f"<blockquote>{p_html}</blockquote>")
             continue
 
         # Markdown pipe table
@@ -227,7 +313,8 @@ def render_markdown(md: str) -> str:
         while (
             i < n
             and lines[i].strip()
-            and not lines[i].strip().startswith(("#", "```", "> ", "- ", "|", "<div ", "<section ", "!["))
+            and not lines[i].strip().startswith(("#", "```", ">", "- ", "|", "<div ", "<section ", "!["))
+            and not re.match(r"^(?:-{3,}|\*{3,}|(?:\*\s+){2,}\*)$", lines[i].strip())
             and not re.match(r"^\d+\.\s+", lines[i].strip())
         ):
             p_lines.append(lines[i].strip())
@@ -247,12 +334,18 @@ def load_posts() -> list[Post]:
                 title=meta["title"],
                 slug=meta["slug"],
                 date=meta["date"],
+                kind=meta.get("kind", ""),
+                style=meta.get("style", ""),
                 tags=tags,
                 summary=meta["summary"],
-                read_time=meta.get("read_time", "5 min"),
+                read_time=meta.get("read_time") or estimate_read_time(body),
+                location=meta.get("location", ""),
+                epigraph=meta.get("epigraph", ""),
+                excerpt=meta.get("excerpt", ""),
                 metric=meta.get("metric", ""),
+                metric_label=meta.get("metric_label", ""),
                 metric_note=meta.get("metric_note", ""),
-                repo_url=meta.get("repo_url", "https://github.com/sandy-sachin7"),
+                repo_url=meta.get("repo_url", ""),
                 featured=meta.get("featured", "false").lower() == "true",
                 poster=meta.get("poster", ""),
                 poster_alt=meta.get("poster_alt", ""),
@@ -317,9 +410,9 @@ def render_shell(
         <a class="brand" href="/">{html.escape(SITE_TITLE)}</a>
         <nav class="nav" aria-label="Primary">
           <a href="{writing_href}"{' aria-current="page"' if is_home else ''}>Writing</a>
-          <a href="{tools_href}">Tools</a>
+          <a href="{tools_href}">Software</a>
           <a href="/feed.xml">RSS</a>
-          <button type="button" id="theme-toggle" class="theme-toggle" aria-pressed="false" aria-label="Switch to Lab Bench dark theme">Ink</button>
+          <button type="button" id="theme-toggle" class="theme-toggle" aria-pressed="false" aria-label="Switch to Ink dark theme">Ink</button>
         </nav>
       </div>
     </div>
@@ -329,11 +422,10 @@ def render_shell(
   </main>
   <footer class="site-footer">
     <div class="wrap footer-inner">
-      <span>Santhosh Sachin, Coimbatore. All benchmarks reproducible from source.</span>
+      <span>Santhosh Sachin, Coimbatore.</span>
       <div class="footer-links">
         <a href="https://github.com/sandy-sachin7">GitHub</a>
         <a href="https://x.com/santhoshssachin">X</a>
-        <a href="https://sandy-sachin7.github.io/deltalens/">DeltaLens</a>
         <a href="/feed.xml">Atom Feed</a>
       </div>
     </div>
@@ -344,49 +436,98 @@ def render_shell(
 """
 
 
+def build_featured_section(featured: Post) -> str:
+    label_parts = [featured.kind or "Featured", featured.date]
+    label = " / ".join(label_parts)
+    cta_label = "Read the piece" if featured.is_literary else "Read the essay"
+
+    aside_html = ""
+    section_cls = "featured"
+    if featured.metric:
+        metric_label = featured.metric_label or "Highlight"
+        aside_html = f"""
+        <div class="featured-proof">
+          <p class="section-label">{html.escape(metric_label)}</p>
+          <p class="proof-stat">{html.escape(featured.metric)}</p>
+          <p class="proof-note">{html.escape(featured.metric_note)}</p>
+        </div>"""
+    elif featured.excerpt:
+        aside_html = f"""
+        <blockquote class="featured-excerpt">
+          <p>{render_inline(featured.excerpt)}</p>
+        </blockquote>"""
+    else:
+        section_cls = "featured featured--single"
+
+    return f"""
+      <section class="{section_cls}" aria-label="Featured writing">
+        <div>
+          <p class="section-label">{html.escape(label)}</p>
+          <h2><a href="/posts/{featured.slug}/">{html.escape(featured.title)}</a></h2>
+          <p>{html.escape(featured.summary)}</p>
+          <a class="cta-link" href="/posts/{featured.slug}/">{cta_label}</a>
+        </div>{aside_html}
+      </section>"""
+
+
 def build_home(posts: list[Post]) -> str:
     featured = next((p for p in posts if p.featured), posts[0])
-    all_tags = sorted({t for p in posts for t in p.tags})
+
+    # Collect kinds first (in deterministic order), then tags, deduplicated case-insensitively
+    filter_labels: list[str] = []
+    seen_filters: set[str] = set()
+    for p in posts:
+        if p.kind and p.kind.lower() not in seen_filters:
+            seen_filters.add(p.kind.lower())
+            filter_labels.append(p.kind)
+    for tag in sorted({t for p in posts for t in p.tags}):
+        if tag.lower() not in seen_filters:
+            seen_filters.add(tag.lower())
+            filter_labels.append(tag)
 
     filter_btns = ['<button type="button" class="filter-btn" data-filter="all" aria-pressed="true">All</button>']
-    for tag in all_tags:
-        slug = tag.lower()
+    for label in filter_labels:
+        slug = label.lower()
         filter_btns.append(
-            f'<button type="button" class="filter-btn" data-filter="{html.escape(slug)}" aria-pressed="false">{html.escape(tag)}</button>'
+            f'<button type="button" class="filter-btn" data-filter="{html.escape(slug)}" aria-pressed="false">{html.escape(label)}</button>'
         )
 
     rows_html: list[str] = []
     for idx, p in enumerate(posts, start=1):
         num = f"{idx:02d}"
-        tags_csv = ",".join(t.lower() for t in p.tags)
+        filter_csv = ",".join(t.lower() for t in p.filter_terms)
+        kind_span = f'<span class="essay-kind">{html.escape(p.kind)}</span>' if p.kind else ""
         tags_spans = "".join(f"<span>#{html.escape(t)}</span>" for t in p.tags)
+        meta_line = f"{html.escape(p.date)}<br>{html.escape(p.read_time)}"
         rows_html.append(
-            f'<li class="essay-row" data-tags="{html.escape(tags_csv)}">'
+            f'<li class="essay-row" data-tags="{html.escape(filter_csv)}">'
             f'  <span class="essay-num">{num}</span>'
             f'  <div>'
             f'    <h3 class="essay-title"><a href="/posts/{p.slug}/">{html.escape(p.title)}</a></h3>'
             f'    <p class="essay-summary">{html.escape(p.summary)}</p>'
-            f'    <div class="essay-tags">{tags_spans}</div>'
+            f'    <div class="essay-tags">{kind_span}{tags_spans}</div>'
             f'  </div>'
-            f'  <div class="essay-meta">{html.escape(p.date)}<br>{html.escape(p.read_time)}</div>'
+            f'  <div class="essay-meta">{meta_line}</div>'
             f'</li>'
         )
+
+    featured_html = build_featured_section(featured)
 
     body = f"""
     <div class="wrap">
       <section class="opener" aria-label="Introduction">
         <div>
-          <h1>Building systems that behave.</h1>
+          <h1>Essays, prose, and software.</h1>
           <p class="opener-lead">
-            Field notes on Rust storage tools, local-first AI daemons, and benchmarks you can run on your own hardware. Every number published here comes from a reproducible script in the repository.
+            A personal notebook for essays, short prose, general thoughts, and technical field notes. Some posts carry Rust code and benchmarks; others are just things worth thinking through in public.
           </p>
         </div>
         <aside class="colophon" aria-label="Author details">
           <dl>
             <dt>Based</dt>
             <dd>Coimbatore, India</dd>
-            <dt>Focus</dt>
-            <dd>Rust, Delta Lake, local semantic search, content-addressed storage</dd>
+            <dt>Writing</dt>
+            <dd>Personal essays, prose, general notes, and engineering</dd>
             <dt>Elsewhere</dt>
             <dd class="colophon-links">
               <a href="https://github.com/sandy-sachin7">GitHub</a>
@@ -396,25 +537,12 @@ def build_home(posts: list[Post]) -> str:
           </dl>
         </aside>
       </section>
-
-      <section class="featured" aria-label="Featured essay">
-        <div>
-          <p class="section-label">Featured note / {html.escape(featured.date)}</p>
-          <h2><a href="/posts/{featured.slug}/">{html.escape(featured.title)}</a></h2>
-          <p>{html.escape(featured.summary)}</p>
-          <a class="cta-link" href="/posts/{featured.slug}/">Read the essay</a>
-        </div>
-        <div class="featured-proof">
-          <p class="section-label">Measured on AMD Ryzen 5 5600H</p>
-          <p class="proof-stat">{html.escape(featured.metric)}</p>
-          <p class="proof-note">{html.escape(featured.metric_note)}</p>
-        </div>
-      </section>
+      {featured_html}
 
       <section class="section-block" id="writing" aria-labelledby="writing-heading">
         <div class="section-head">
           <h2 id="writing-heading">Writing</h2>
-          <div class="filter-bar" role="group" aria-label="Filter essays by topic">
+          <div class="filter-bar" role="group" aria-label="Filter writing by topic">
             {''.join(filter_btns)}
           </div>
         </div>
@@ -422,14 +550,14 @@ def build_home(posts: list[Post]) -> str:
           {''.join(rows_html)}
         </ol>
         <div id="filter-empty" class="empty-state hidden" role="status">
-          <p>No published notes match that topic yet.</p>
-          <button type="button" id="filter-reset">Show all notes</button>
+          <p>No published pieces match that topic yet.</p>
+          <button type="button" id="filter-reset">Show all writing</button>
         </div>
       </section>
 
       <section class="section-block" id="tools" aria-labelledby="tools-heading">
         <div class="section-head">
-          <h2 id="tools-heading">Open-source tools</h2>
+          <h2 id="tools-heading">Software &amp; open source</h2>
         </div>
         <div class="tools-ledger">
           <div class="tool-row">
@@ -507,12 +635,12 @@ def build_home(posts: list[Post]) -> str:
     }
 
     return render_shell(
-        title=f"{SITE_TITLE} | Systems Engineering Notes & Rust Benchmarks",
+        title=f"{SITE_TITLE} | Essays, Prose, and Software",
         description=SITE_DESC,
         canonical=f"{SITE_URL}/",
         og_type="website",
         og_image="/assets/blog-og.png",
-        og_image_alt="Santhosh Sachin: Building systems that behave. Field notes on deltalens, contextd, and shard.",
+        og_image_alt="Santhosh Sachin: Essays, prose, and software. Personal writing, general notes, and open-source tools.",
         json_ld=json_ld,
         body_html=body,
         is_home=True,
@@ -522,44 +650,61 @@ def build_home(posts: list[Post]) -> str:
 
 def build_post_page(post: Post, prev_post: Post | None, next_post: Post | None) -> str:
     canonical = f"{SITE_URL}/posts/{post.slug}/"
-    tags_html = " ".join(f"<span>#{html.escape(t)}</span>" for t in post.tags)
+
+    meta_items: list[str] = [f'<time datetime="{html.escape(post.date)}">{html.escape(post.date)}</time>']
+    if post.location:
+        meta_items.append(f"<span>{html.escape(post.location)}</span>")
+    meta_items.append(f"<span>{html.escape(post.read_time)} read</span>")
+    if post.kind:
+        meta_items.append(f'<span class="meta-kind">{html.escape(post.kind)}</span>')
+    if post.tags:
+        tags_html = " ".join(f"<span>#{html.escape(t)}</span>" for t in post.tags)
+        meta_items.append(f"<span>{tags_html}</span>")
+    if post.repo_url:
+        meta_items.append(f'<a href="{html.escape(post.repo_url)}">Repository</a>')
 
     nav_left = (
         f'<a href="/posts/{prev_post.slug}/">Previous: {html.escape(prev_post.title)}</a>'
         if prev_post
-        else '<a href="/">Back to all notes</a>'
+        else '<a href="/">Back to all writing</a>'
     )
-    nav_right = (
-        f'<a href="/posts/{next_post.slug}/">Next: {html.escape(next_post.title)}</a>'
-        if next_post
-        else f'<a href="{html.escape(post.repo_url)}">View source on GitHub</a>'
-    )
+    if next_post:
+        nav_right = f'<a href="/posts/{next_post.slug}/">Next: {html.escape(next_post.title)}</a>'
+    elif post.repo_url:
+        nav_right = f'<a href="{html.escape(post.repo_url)}">View source on GitHub</a>'
+    else:
+        nav_right = '<a href="/#writing">All writing</a>'
 
     poster_html = ""
     if post.poster:
         alt_text = post.poster_alt or post.title
         poster_html = (
             f'<figure class="poster-figure">'
-            f'<img src="{html.escape(post.poster)}" alt="{html.escape(alt_text)}" width="1600" height="900" loading="eager">'
+            f'<img src="{html.escape(post.poster)}" alt="{html.escape(alt_text)}" width="1600" height="900" loading="eager" fetchpriority="high">'
             f'<figcaption>{html.escape(alt_text)}</figcaption>'
             f"</figure>"
         )
 
+    epigraph_html = ""
+    if post.epigraph:
+        epigraph_html = f'<blockquote class="epigraph"><p>{render_inline(post.epigraph)}</p></blockquote>'
+
+    crumb_tail = html.escape(post.kind or post.slug)
+    prose_cls = "prose prose--literary" if post.is_literary else "prose"
+
     body = f"""
     <article class="article-wrap">
-      <div class="breadcrumb"><a href="/">Home</a> / <a href="/#writing">Writing</a> / {html.escape(post.slug)}</div>
+      <div class="breadcrumb"><a href="/">Home</a> / <a href="/#writing">Writing</a> / {crumb_tail}</div>
       <header class="article-header">
         <h1>{html.escape(post.title)}</h1>
         <p class="article-dek">{html.escape(post.summary)}</p>
         <div class="article-meta">
-          <time datetime="{html.escape(post.date)}">{html.escape(post.date)}</time>
-          <span>{html.escape(post.read_time)} read</span>
-          <span>{tags_html}</span>
-          <a href="{html.escape(post.repo_url)}">Repository</a>
+          {''.join(meta_items)}
         </div>
       </header>
       {poster_html}
-      <div class="prose">
+      {epigraph_html}
+      <div class="{prose_cls}">
         {post.body_html}
       </div>
       <footer class="article-footer" aria-label="Post navigation">

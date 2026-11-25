@@ -2,6 +2,7 @@
 title: "Why Zstd barely compresses model weights, and where FastCDC actually wins"
 slug: "shard-zstd-weights-and-rabin-cdc"
 date: "2026-11-25"
+kind: "Engineering"
 tags: "Rust, Storage, Benchmarks"
 summary: "Measuring Shard on 256 MiB high-entropy payloads, JSONL datasets, and 64 MiB FP32 safetensors-style checkpoints shows 1.00x weight compression, 0.0% dedup on full fine-tuning, 89.0% dedup on frozen backbones, and 98.5% FastCDC dedup on offset shifts."
 read_time: "6 min"

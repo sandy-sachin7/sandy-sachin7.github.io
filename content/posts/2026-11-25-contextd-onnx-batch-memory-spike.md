@@ -2,6 +2,7 @@
 title: "How one unbounded ONNX batch pushed our local MCP daemon to 2.25 GB RAM"
 slug: "contextd-onnx-batch-memory-spike"
 date: "2026-11-25"
+kind: "Engineering"
 tags: "Rust, Local AI, Benchmarks"
 summary: "Micro-benchmarks on 100 synthetic chunks hid a 2.25 GB RAM spike and a 16.5-second query stall in contextd. Here is how an end-to-end codebase benchmark caught it, the micro-batch fix, and the v4.1.0 int8 and retrieval eval numbers."
 read_time: "6 min"

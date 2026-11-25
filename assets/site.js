@@ -12,7 +12,7 @@
       btn.textContent = isDark ? "Paper" : "Ink";
       btn.setAttribute(
         "aria-label",
-        isDark ? "Switch to Archival Paper light theme" : "Switch to Lab Bench dark theme"
+        isDark ? "Switch to Archival Paper light theme" : "Switch to Ink dark theme"
       );
     }
   }

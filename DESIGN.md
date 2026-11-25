@@ -1,9 +1,10 @@
 # Design Direction: sandy-sachin7.github.io
 
 ## Identity
-- Author: Santhosh Sachin (`sandy-sachin7`), systems engineer in Coimbatore, India.
-- Voice: direct, measured, first-person engineering notes backed by reproducible scripts. No hype, no em dashes, no unverified numbers.
-- Aesthetic: editorial print journal meets systems lab notebook.
+- Author: Santhosh Sachin (`sandy-sachin7`), Coimbatore, India.
+- Scope: personal essays, short prose, general writing, and engineering notes.
+- Voice: direct, first-person, plain language. No hype, no em dashes, no unverified numbers in technical posts.
+- Aesthetic: archival print journal. One layout language that holds literary prose and technical tables without feeling split in two.
 
 ## Palette (WCAG AA verified with contrast-check.py)
 Two core neutrals plus one editorial accent per mode.
@@ -18,7 +19,7 @@ Two core neutrals plus one editorial accent per mode.
 - Subtle hairline (`--rule`): `#D3CBB9`
 - Positive metric highlight (`--good`): `#1B6B46` (5.85:1 on canvas)
 
-### Dark mode (Lab Bench Ink)
+### Dark mode (Ink)
 - Canvas (`--bg`): `#141311`
 - Surface (`--surface`): `#1E1C19`
 - Primary ink (`--ink`): `#F0ECE2` (15.74:1 on canvas, 14.41:1 on surface)
@@ -29,12 +30,12 @@ Two core neutrals plus one editorial accent per mode.
 - Positive metric highlight (`--good`): `#58C78B` (8.80:1 on canvas)
 
 ## Typography
-- Display and article titles: `Newsreader` (optical serif, Georgia fallback) for editorial print authority.
-- Body and UI controls: `IBM Plex Sans` (system sans fallback) for legible technical prose.
-- Benchmarks, CLI output, and dates: `IBM Plex Mono` (`font-variant-numeric: tabular-nums`) so numbers align cleanly across tables.
+- Display, article titles, and literary body (`.prose--literary` for personal essays, prose, fiction, and poetry): `Newsreader` (optical serif, Georgia fallback).
+- Technical body and UI controls: `IBM Plex Sans` (system sans fallback) for code-heavy notes and tables.
+- Code, dates, folio numbers, and tabular metrics: `IBM Plex Mono` (`font-variant-numeric: tabular-nums`).
 - Fluid scale via `clamp()` across all viewports.
 
 ## Layout and Motif
-- Motif: double-rule masthead (`2px` primary ink over `1px` hairline), folio index numbers (`01`, `02`, `03`), and structured tabular ledgers instead of identical card grids.
+- Motif: double-rule masthead (`2px` primary ink over `1px` hairline), folio index numbers (`01`, `02`, `03`), centered `* * *` scene breaks in prose, and structured ledgers instead of identical card grids.
 - Breakpoints (3 states): narrow (<640px, single-column compact register), medium (640px to 960px, reflowed ledger and two-column intro), wide (>960px, full editorial measure with marginalia).
 - Touch and keyboard: minimum 44x44px tap targets on interactive controls, `cursor: pointer` on enabled buttons, visible 2px `:focus-visible` outlines in `--accent`.

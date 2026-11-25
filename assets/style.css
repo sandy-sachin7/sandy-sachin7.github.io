@@ -296,6 +296,10 @@ main {
     gap: 44px;
     align-items: start;
   }
+
+  .featured--single {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .section-label {
@@ -371,6 +375,23 @@ main {
   font-size: 0.88rem;
   color: var(--muted);
   margin: 0;
+}
+
+.featured-excerpt {
+  margin: 0;
+  padding: 16px 20px;
+  border-left: 2px solid var(--accent);
+  background: transparent;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.04rem, 1.4vw, 1.16rem);
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.featured-excerpt p {
+  margin: 0;
+  color: var(--ink);
 }
 
 /* Section headers and filter bar */
@@ -480,10 +501,17 @@ main {
 .essay-tags {
   display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
   gap: 10px;
   font-family: var(--font-mono);
   font-size: 0.78rem;
   color: var(--muted);
+}
+
+.essay-kind,
+.meta-kind {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .essay-meta {
@@ -644,6 +672,73 @@ main {
 .prose {
   font-size: clamp(1rem, 1.25vw, 1.07rem);
   line-height: 1.72;
+}
+
+/* Literary reading mode for personal essays, prose, stories, and poetry */
+.prose--literary {
+  font-family: var(--font-serif);
+  font-size: clamp(1.1rem, 1.45vw, 1.2rem);
+  line-height: 1.82;
+  max-width: 62ch;
+}
+
+.prose--literary p {
+  margin: 0 0 20px;
+}
+
+.prose--literary blockquote {
+  background: transparent;
+  border-left: 2px solid var(--accent);
+  padding: 4px 0 4px 20px;
+  font-style: italic;
+}
+
+.epigraph {
+  margin: 0 0 32px;
+  padding: 0 0 0 18px;
+  border-left: 2px solid var(--rule);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.02rem, 1.35vw, 1.12rem);
+  line-height: 1.65;
+  color: var(--muted);
+  max-width: 56ch;
+}
+
+.epigraph p {
+  margin: 0;
+}
+
+.scene-break {
+  border: 0;
+  margin: 38px 0;
+  text-align: center;
+  height: auto;
+  color: var(--muted);
+}
+
+.scene-break::after {
+  content: "*   *   *";
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  letter-spacing: 0.35em;
+}
+
+.verse {
+  margin: 28px 0;
+  padding-left: clamp(12px, 3vw, 28px);
+  font-family: var(--font-serif);
+  font-size: clamp(1.06rem, 1.35vw, 1.16rem);
+  line-height: 1.75;
+  color: var(--ink);
+}
+
+.verse p {
+  margin: 0 0 20px;
+}
+
+.verse p:last-child {
+  margin-bottom: 0;
 }
 
 .prose h2 {

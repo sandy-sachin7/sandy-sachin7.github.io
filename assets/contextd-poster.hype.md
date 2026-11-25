@@ -40,7 +40,7 @@ color_yellow: "#E5A93C"
   <text x="88" y="696" font-family="Noto Sans" font-size="20" fill="var(--dark-foreground)">Peak RSS with length-sorted int8 batches</text>
 
   <!-- Colophon -->
-  <text x="88" y="788" font-family="JetBrainsMono Nerd Font" font-size="16" fill="var(--dark-foreground)">v4.1.0  |  Zero cloud APIs  |  MIT</text>
+  <text x="88" y="788" font-family="JetBrainsMono Nerd Font" font-size="16" fill="var(--dark-foreground)">v4.2.0  |  0.884 MRR (72q)  |  MIT</text>
 
   <!-- Right column: Panel A - ONNX Micro-Batch Fix -->
   <text x="692" y="132" font-family="Noto Sans" font-size="23" font-weight="700" fill="var(--foreground)">Capping the ONNX CPU memory arena</text>

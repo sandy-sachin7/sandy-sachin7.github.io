@@ -4,14 +4,14 @@ slug: "contextd-onnx-batch-memory-spike"
 date: "2026-11-25"
 kind: "Engineering"
 tags: "Rust, Local AI, Benchmarks"
-summary: "Micro-benchmarks on 100 synthetic chunks hid a 2.25 GB RAM spike and a 16.5-second query stall in contextd. Here is how an end-to-end codebase benchmark caught it, the micro-batch fix, and the v4.1.0 int8 and retrieval eval numbers."
-read_time: "6 min"
+summary: "Micro-benchmarks on 100 synthetic chunks hid a 2.25 GB RAM spike and a 16.5-second query stall in contextd. Here is how an end-to-end codebase benchmark caught it, the micro-batch fix, the v4.1.0 int8 numbers, and the v4.2.0 retrieval changes that beat ripgrep across 72 queries in 3 repos."
+read_time: "7 min"
 metric: "2.25 GB -> 989 MB"
-metric_note: "Peak indexing RSS dropped from 2,246.1 MB to 988.7 MB in v4.1.0 (int8), with initial repo indexing down to 33.99 s and steady-state hybrid queries at 4.84 ms p50."
+metric_note: "Peak indexing RSS dropped from 2,246.1 MB to 988.7 MB in v4.1.0 (int8), warm queries run at 4.84 ms p50, and v4.2.0 hybrid retrieval reaches 0.884 MRR and 0.896 nDCG@10 across 72 queries in 3 repos (vs 0.750 / 0.786 for ripgrep)."
 repo_url: "https://github.com/sandy-sachin7/contextd"
 featured: "false"
 poster: "/assets/contextd-poster.png"
-poster_alt: "contextd v4.1.0 benchmark plate: length-sorted 16-chunk micro-batching and int8 ONNX drop peak indexing RSS from 2,246.1 MB to 988.7 MB, with warm hybrid queries at 4.84 ms p50 and 5.69 ms p95."
+poster_alt: "contextd v4.2.0 benchmark plate: length-sorted 16-chunk micro-batching and int8 ONNX drop peak indexing RSS from 2,246.1 MB to 988.7 MB, with warm hybrid queries at 4.84 ms p50 and 5.69 ms p95."
 ---
 
 Criterion micro-benchmarks lie when they only measure small synthetic inputs.
@@ -103,7 +103,34 @@ Speed means little without retrieval quality numbers. Release `v4.1.0` checks in
 | `hybrid_rrf` (`recency=0, freq=0`) | 0.472 | 0.861 | **1.000** | 0.649 | 0.719 | 0.433 | 0.958 | 0.555 |
 | `hybrid_default` | 0.556 | 0.806 | 0.972 | 0.676 | 0.736 | 0.379 | **1.000** | 0.647 |
 
-The trade-off shows directly in that table. `hybrid_rrf` hits `1.000` Recall@10 (every expected file appears in the top 10, vs `0.917` for `ripgrep`) and `hybrid_default` hits `1.000` MRR on exact symbols, while `all-minilm-l6-v2-q8` stays within `0.005` MRR of FP32 (`0.676` vs `0.681`). `ripgrep` still leads top-1 MRR (`0.793` vs `0.676`) when `README.md`, `CHANGELOG.md`, and `docs/` are indexed alongside `src/`, because general-text MiniLM scores prose documentation ahead of Rust source chunks. Pass `--paths src/` or `--file-types rs` for code-only queries.
+The trade-off showed directly in that `v4.1.0` table. `hybrid_rrf` reached `1.000` Recall@10, while `ripgrep` still led top-1 MRR (`0.793` vs `0.676`) whenever `README.md`, `CHANGELOG.md`, and `docs/` were indexed alongside `src/`.
+
+## v4.2.0 update: fixing hybrid ranking across three repositories
+
+Shipping `v4.1.0` with an honest retrieval table made the ranking bugs obvious. Four root causes held hybrid search behind `ripgrep`:
+
+1. Large Rust `impl` and `mod` blocks were embedded as one coarse chunk instead of individual methods.
+2. Chunk embeddings omitted the file path, and BAAI BGE models ran without their query instruction prefix.
+3. FTS5 indexed raw chunk text only, so `camelCase` and `snake_case` identifiers and file paths did not split cleanly into searchable tokens.
+4. General-text MiniLM scored prose changelogs and docs ahead of source files, and recency or frequency boosts could reorder tie-broken matches.
+
+Release `v4.2.0` addresses each of those four causes in `src/indexer/chunker.rs`, `src/indexer/embeddings.rs`, `src/daemon.rs`, and `src/storage/db.rs`:
+
+- **Method-level Rust AST chunking.** Large `impl_item` and `mod_item` nodes split into individual `function_item` chunks while keeping byte offsets exact.
+- **Path-contextualized embeddings and query prefixing.** Embeddings prepend the repository-relative file path at index time without mutating stored `chunks.content`, and `TextEmbedder::embed_query` applies the BGE query prefix where the model expects it.
+- **Identifier-split FTS5 documents.** FTS5 indexes the tail file path alongside `camelCase` and `snake_case` split identifier tokens, paired with matching query expansion.
+- **Stage-2 hybrid reranking.** `search_chunks_hybrid` runs pure cosine KNN before RRF (`k = 40`), then reranks with candidate-set IDF-weighted distinct term coverage, exact identifier and definition-site (`fn`, `struct`, `enum`, `trait`, `class`, `def`) bonuses, path alignment, a source-over-changelog/docs structural prior, deterministic unclamped sorting (`score DESC, id ASC`), and per-file diversity dampening (`0.80^k`).
+
+To make sure those changes did not overfit `contextd`, `v4.2.0` adds uncontaminated query sets for two unseen Rust repositories ([eval/deltalens_queries.json](https://github.com/sandy-sachin7/contextd/blob/main/eval/deltalens_queries.json) and [eval/shard_queries.json](https://github.com/sandy-sachin7/contextd/blob/main/eval/shard_queries.json)) alongside `contextd` ([eval/contextd_queries.json](https://github.com/sandy-sachin7/contextd/blob/main/eval/contextd_queries.json)), for 72 queries total using `all-minilm-l6-v2-q8` (raw JSON reports checked in as [results-q8.json](https://github.com/sandy-sachin7/contextd/blob/main/eval/results-q8.json), [results-deltalens-q8.json](https://github.com/sandy-sachin7/contextd/blob/main/eval/results-deltalens-q8.json), and [results-shard-q8.json](https://github.com/sandy-sachin7/contextd/blob/main/eval/results-shard-q8.json)):
+
+| Repository | `ripgrep` MRR / nDCG@10 | `fts_only` MRR / nDCG@10 | `vector_only` MRR / nDCG@10 | `hybrid_default` MRR / nDCG@10 |
+| :--- | :--- | :--- | :--- | :--- |
+| `contextd` (36 queries, 992 chunks, 25.66 s index) | 0.793 / 0.816 | 0.736 / 0.798 | 0.728 / 0.762 | **0.851 / 0.861** |
+| `deltalens` (18 queries, unseen, 843 chunks, 26.75 s) | 0.698 / 0.748 | 0.764 / 0.812 | 0.889 / 0.901 | **0.931 / 0.952** |
+| `shard` (18 queries, unseen, 1,604 chunks, 37.94 s) | 0.715 / 0.762 | 0.739 / 0.789 | 0.831 / 0.859 | **0.903 / 0.911** |
+| **Weighted average (72 queries)** | **0.750 / 0.786** | **0.744 / 0.799** | **0.794 / 0.821** | **0.884 / 0.896** |
+
+Across all 72 queries, `hybrid_default` beats `ripgrep`, `fts_only`, and `vector_only` on every repository. On natural-language semantic queries specifically, weighted average Semantic MRR rises from `0.560` (`ripgrep`) to `0.838` (`hybrid_default`), hitting `1.000` Semantic MRR on both unseen repositories.
 
 Reproduce both benchmarks on any repository:
 

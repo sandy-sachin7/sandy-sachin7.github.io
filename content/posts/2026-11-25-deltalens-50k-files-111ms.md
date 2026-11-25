@@ -119,6 +119,14 @@ Fast metadata replay only helps if the replay matches the Delta Lake specificati
 - **Spec-compliant typeWidening rules.** Schema diffing now treats `date` to `timestamp` as breaking, permits `date` to `timestamp_ntz`, allows integer-to-double and bounded integer-to-decimal widenings (`byte`, `short`, `integer`, `long` to `decimal(p, s)` with integral digits at least `3`, `5`, `10`, and `19`), and allows scale-preserving decimal widening.
 - **Parser fuzzing and live S3 HTTP CI.** Four `cargo-fuzz` targets under `fuzz/` exercise NDJSON actions, schema JSON, table paths, and V2 sidecar parsing. Integration tests in `tests/cloud_s3.rs` run in GitHub Actions against an ephemeral Moto S3 HTTP server via `scripts/run_s3_test.py`.
 
+## What shipped in v2.2.0: Apache Spark DAT conformance and continuous fuzzing
+
+Comparing against `delta-rs` alone leaves open whether a parser matches tables written by Apache Spark itself. Release `v2.2.0` adds official Spark conformance tests, scheduled fuzzing in CI, and an opt-in live cloud workflow:
+
+- **Official Apache Spark DAT suite (`delta-incubator/dat v0.0.3`).** [scripts/dat_test.py](https://github.com/sandy-sachin7/deltalens/blob/main/scripts/dat_test.py) downloads the SHA-256 pinned `delta-incubator/dat v0.0.3` release archive (`19c045bc...`) and validates all 19 Spark-written Delta tables across 29 expected snapshots (both `latest` and historical versions `v0`, `v1`, and `v2`). All 19 tables and 29 snapshots pass in the `spark-dat` GitHub Actions job on every push.
+- **Continuous parser fuzzing in CI.** Checked-in seed corpora under `fuzz/corpus/` drive all four targets (`commit_ndjson`, `last_checkpoint`, `parquet_checkpoint`, `schema_json`) in [.github/workflows/fuzz.yml](https://github.com/sandy-sachin7/deltalens/blob/main/.github/workflows/fuzz.yml) on a weekly schedule, on parser pull requests, and on manual dispatch.
+- **Opt-in live cloud check.** [.github/workflows/cloud-live.yml](https://github.com/sandy-sachin7/deltalens/blob/main/.github/workflows/cloud-live.yml) runs `deltalens inspect` against live S3, GCS, or Azure ADLS buckets via `workflow_dispatch` when credentials are supplied.
+
 ## Wiring it into CI in five lines
 
 DeltaLens ships a composite GitHub Action with SHA-256 binary verification. Breaking schema changes (column removal, Column Mapping renames, narrowing type conversions, or tightened nullability) exit with code `2` and post a report to `$GITHUB_STEP_SUMMARY`.
@@ -131,4 +139,4 @@ DeltaLens ships a composite GitHub Action with SHA-256 binary verification. Brea
     args: --v1 ${{ env.PREV_VER }} --v2 ${{ env.CURR_VER }} --fail-on-breaking
 ```
 
-Install `v2.1.0` with `cargo install deltalens` (or `--no-default-features` for a pure-local build with zero HTTP dependencies).
+Install `v2.2.0` with `cargo install deltalens` (or `--no-default-features` for a pure-local build with zero HTTP dependencies).

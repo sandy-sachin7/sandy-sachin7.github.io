@@ -63,9 +63,24 @@ That result sets clear boundaries for where chunk-level deduplication pays off:
 - **Full fine-tuning breaks chunk dedup completely.** Even a `1e-4` gradient step flips bits across every weight tensor, so every chunk hash misses (`0.0%` savings).
 - **Partial updates and LoRA/adapter workflows deduplicate cleanly.** When 90% of the backbone stays frozen, FastCDC stores `6.52 MiB` (`89.0%` dedup). When a new tensor or metadata block shifts offsets in front of frozen layers, fixed chunking drops to `0.0%` while FastCDC recovers `54.5%`.
 
-Release `v2.5.0` also makes multi-file `shard checkout` transactional: every target file is staged and verified before persisting, and any mid-checkout write error restores backed-up files rather than leaving a half-checked-out tree.
+## Durable crash-atomic checkout journal (v2.5.1 and v2.5.2)
 
-Run both scripts on your own disk:
+Release `v2.5.0` added staged multi-file `shard checkout`, yet a closer review showed that staging alone was not crash-atomic. A backup failure on file 2 after file 1 was already replaced, a failure while updating `HEAD`, or a process kill mid-swap could still leave a half-updated working tree, and rollback ignored restore errors.
+
+Release `v2.5.1` replaces that path with a journaled checkout in `core/src/repo.rs` backed by `.shard/checkout_journal.json`:
+
+1. Stage and hash-verify every manifest into same-directory temp files before touching any target.
+2. Copy every existing target file to a `.shardbak` backup and `sync_all()` each backup before mutating the working tree.
+3. Atomically persist and fsync `.shard/checkout_journal.json` in phase `Swapping`.
+4. Swap staged files into place and fsync parent directories.
+5. Persist the journal in phase `UpdatingHead`, then update `HEAD` atomically.
+6. Remove backup files and delete the journal only after `HEAD` is durable.
+
+If a swap or `HEAD` update fails, rollback restores every replaced file via idempotent copy-and-replace from the durable backups, restores `HEAD`, surfaces any restore error through `ShardError::CheckoutRollbackFailed`, and keeps `.shard/checkout_journal.json` on disk so `shard recover` can retry. Running `shard recover` (or any subsequent `add`, `commit`, or `checkout`) replays an interrupted journal automatically, rolling back `Swapping` journals and rolling forward `UpdatingHead` journals.
+
+Six deterministic boundary fault-injection tests in [tests/resilience.rs](https://github.com/sandy-sachin7/shard/blob/main/tests/resilience.rs) exercise failures during backup creation, mid-swap, `HEAD` update, simulated mid-swap crash, simulated `UpdatingHead` crash, and corrupt-backup rollback error propagation. Release `v2.5.2` opens backup files with write access (`OpenOptions::new().write(true)`) before `sync_all()` so Windows `FlushFileBuffers` succeeds without `os error 5`, verified across Linux, macOS, and Windows CI.
+
+Run both benchmark scripts on your own disk:
 
 ```bash
 git clone https://github.com/sandy-sachin7/shard.git

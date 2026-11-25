@@ -9,6 +9,8 @@ metric: "2.25 GB -> 1.18 GB"
 metric_note: "Peak indexing RSS cut nearly in half, with steady-state hybrid queries landing at 6.44 ms p50 and 7.74 ms p95."
 repo_url: "https://github.com/sandy-sachin7/contextd"
 featured: "false"
+poster: "/assets/contextd-poster.png"
+poster_alt: "contextd v4.0.2 benchmark plate: ONNX micro-batching at 16 chunks drops peak indexing RSS from 2,246.1 MB to 1,177.6 MB, with warm hybrid queries at 6.44 ms p50 and 7.74 ms p95."
 ---
 
 Criterion micro-benchmarks lie when they only measure small synthetic inputs.

@@ -51,6 +51,8 @@ class Post:
     metric_note: str
     repo_url: str
     featured: bool
+    poster: str
+    poster_alt: str
     body_md: str
     body_html: str
 
@@ -205,13 +207,27 @@ def render_markdown(md: str) -> str:
             out.append(f"<ol>{''.join(items)}</ol>")
             continue
 
+        # Standalone Markdown image: ![alt](src)
+        img_match = re.match(r"^!\[([^\]]*)\]\((https?://[^\s)]+|/[^\s)]+)\)$", stripped)
+        if img_match:
+            alt_txt = html.escape(img_match.group(1))
+            src_url = html.escape(img_match.group(2))
+            caption = f"<figcaption>{alt_txt}</figcaption>" if alt_txt else ""
+            out.append(
+                f'<figure class="poster-figure">'
+                f'<img src="{src_url}" alt="{alt_txt}" width="1600" height="900" loading="lazy">'
+                f"{caption}</figure>"
+            )
+            i += 1
+            continue
+
         # Paragraph
         p_lines = [stripped]
         i += 1
         while (
             i < n
             and lines[i].strip()
-            and not lines[i].strip().startswith(("#", "```", "> ", "- ", "|", "<div ", "<section "))
+            and not lines[i].strip().startswith(("#", "```", "> ", "- ", "|", "<div ", "<section ", "!["))
             and not re.match(r"^\d+\.\s+", lines[i].strip())
         ):
             p_lines.append(lines[i].strip())
@@ -238,6 +254,8 @@ def load_posts() -> list[Post]:
                 metric_note=meta.get("metric_note", ""),
                 repo_url=meta.get("repo_url", "https://github.com/sandy-sachin7"),
                 featured=meta.get("featured", "false").lower() == "true",
+                poster=meta.get("poster", ""),
+                poster_alt=meta.get("poster_alt", ""),
                 body_md=body,
                 body_html=render_markdown(body),
             )
@@ -252,6 +270,8 @@ def render_shell(
     description: str,
     canonical: str,
     og_type: str,
+    og_image: str,
+    og_image_alt: str,
     json_ld: dict,
     body_html: str,
     is_home: bool = False,
@@ -261,6 +281,7 @@ def render_shell(
     writing_href = "#writing" if is_home else "/#writing"
     tools_href = "#tools" if is_home else "/#tools"
     ld_json = json.dumps(json_ld, ensure_ascii=False)
+    full_og_image = og_image if og_image.startswith("http") else f"{SITE_URL}{og_image}"
     return f"""<!doctype html>
 <html lang="en" data-theme="light">
 <head>
@@ -274,7 +295,12 @@ def render_shell(
   <meta property="og:description" content="{html.escape(description)}">
   <meta property="og:type" content="{og_type}">
   <meta property="og:url" content="{html.escape(canonical)}">
+  <meta property="og:image" content="{html.escape(full_og_image)}">
+  <meta property="og:image:width" content="1600">
+  <meta property="og:image:height" content="900">
+  <meta property="og:image:alt" content="{html.escape(og_image_alt)}">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="{html.escape(full_og_image)}">
   {FONTS_LINK}
   <link rel="stylesheet" href="/assets/style.css">
   <script type="application/ld+json">{ld_json}</script>
@@ -485,6 +511,8 @@ def build_home(posts: list[Post]) -> str:
         description=SITE_DESC,
         canonical=f"{SITE_URL}/",
         og_type="website",
+        og_image="/assets/blog-og.png",
+        og_image_alt="Santhosh Sachin: Building systems that behave. Field notes on deltalens, contextd, and shard.",
         json_ld=json_ld,
         body_html=body,
         is_home=True,
@@ -507,6 +535,16 @@ def build_post_page(post: Post, prev_post: Post | None, next_post: Post | None) 
         else f'<a href="{html.escape(post.repo_url)}">View source on GitHub</a>'
     )
 
+    poster_html = ""
+    if post.poster:
+        alt_text = post.poster_alt or post.title
+        poster_html = (
+            f'<figure class="poster-figure">'
+            f'<img src="{html.escape(post.poster)}" alt="{html.escape(alt_text)}" width="1600" height="900" loading="eager">'
+            f'<figcaption>{html.escape(alt_text)}</figcaption>'
+            f"</figure>"
+        )
+
     body = f"""
     <article class="article-wrap">
       <div class="breadcrumb"><a href="/">Home</a> / <a href="/#writing">Writing</a> / {html.escape(post.slug)}</div>
@@ -520,6 +558,7 @@ def build_post_page(post: Post, prev_post: Post | None, next_post: Post | None) 
           <a href="{html.escape(post.repo_url)}">Repository</a>
         </div>
       </header>
+      {poster_html}
       <div class="prose">
         {post.body_html}
       </div>
@@ -530,6 +569,10 @@ def build_post_page(post: Post, prev_post: Post | None, next_post: Post | None) 
     </article>
     """
 
+    post_og_image = post.poster or "/assets/blog-og.png"
+    post_og_alt = post.poster_alt or post.title
+    full_post_image = post_og_image if post_og_image.startswith("http") else f"{SITE_URL}{post_og_image}"
+
     json_ld = {
         "@context": "https://schema.org",
         "@graph": [
@@ -537,6 +580,7 @@ def build_post_page(post: Post, prev_post: Post | None, next_post: Post | None) 
                 "@type": "BlogPosting",
                 "headline": post.title,
                 "description": post.summary,
+                "image": full_post_image,
                 "datePublished": post.date,
                 "dateModified": post.date,
                 "mainEntityOfPage": canonical,
@@ -561,6 +605,8 @@ def build_post_page(post: Post, prev_post: Post | None, next_post: Post | None) 
         description=post.summary,
         canonical=canonical,
         og_type="article",
+        og_image=post_og_image,
+        og_image_alt=post_og_alt,
         json_ld=json_ld,
         body_html=body,
         is_home=False,
@@ -612,7 +658,7 @@ def main() -> None:
     if DIST_DIR.exists():
         shutil.rmtree(DIST_DIR)
     DIST_DIR.mkdir(parents=True)
-    shutil.copytree(ASSETS_DIR, DIST_DIR / "assets")
+    shutil.copytree(ASSETS_DIR, DIST_DIR / "assets", ignore=shutil.ignore_patterns("*.hype.md"))
 
     posts = load_posts()
     (DIST_DIR / "index.html").write_text(build_home(posts), encoding="utf-8")

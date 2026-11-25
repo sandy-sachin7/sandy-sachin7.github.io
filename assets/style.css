@@ -870,6 +870,29 @@ main {
   color: var(--muted);
 }
 
+/* Article poster figures (Hype-rendered 16:9 plates) */
+.poster-figure {
+  margin: 24px 0 32px;
+}
+
+.poster-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.poster-figure figcaption {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 /* Article footer navigation */
 .article-footer {
   margin-top: 48px;

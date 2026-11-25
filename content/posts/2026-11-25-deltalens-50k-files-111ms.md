@@ -9,6 +9,8 @@ metric: "2.91 ms / 12.5 MB"
 metric_note: "Cold CLI inspect on a real 60-commit checkpointed Delta table vs 56.5 ms cold (3.74 ms warm) and 160.9 MB RSS in deltalake Python."
 repo_url: "https://github.com/sandy-sachin7/deltalens"
 featured: "true"
+poster: "/assets/deltalens-poster.png"
+poster_alt: "DeltaLens 2.0.1 vs deltalake 1.7.0 benchmark plate: 111.01 ms cold CLI latency and 89.4 MB peak RSS on 50,000 files, and 2.91 ms on a 60-commit checkpointed table."
 ---
 
 When a Delta Lake table slows down, the first four questions are almost always metadata questions. How many files sit under 32 MB? How skewed are the file sizes? How much dead data is waiting on `VACUUM`? Did last night's `MERGE` drop or narrow a column?

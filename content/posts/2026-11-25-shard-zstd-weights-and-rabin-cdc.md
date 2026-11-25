@@ -9,6 +9,8 @@ metric: "98.5% dedup"
 metric_note: "Rabin CDC stores 3.74 MiB after a 1 MiB header prepend on 256 MiB high-entropy weights, while fixed 4 MiB chunking re-stores 257.01 MiB."
 repo_url: "https://github.com/sandy-sachin7/shard"
 featured: "false"
+poster: "/assets/shard-poster.png"
+poster_alt: "Shard Rabin CDC vs fixed 4 MiB chunking diagram: a 1 MiB prepend over 256 MiB high-entropy weights re-stores 257.01 MiB with fixed chunks vs 3.74 MiB (98.5% dedup) with Rabin CDC."
 ---
 
 Earlier versions of the [Shard](https://github.com/sandy-sachin7/shard) README included an estimated LAN transfer table that assumed 3x to 5x Zstd compression on 10 GB ML checkpoints.

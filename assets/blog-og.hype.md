@@ -58,14 +58,14 @@ color_accent: "#A83316"
   <!-- Column 2: contextd -->
   <line x1="564" y1="658" x2="564" y2="796" stroke="#D3CBB9" stroke-width="1.5"/>
   <text x="596" y="684" font-family="JetBrainsMono Nerd Font" font-size="18" font-weight="700" fill="var(--accent)">contextd</text>
-  <text x="596" y="738" font-family="JetBrainsMono Nerd Font" font-size="36" font-weight="700" fill="var(--foreground)">6.44 ms p50</text>
-  <text x="596" y="776" font-family="Noto Sans" font-size="18" fill="var(--dark-foreground)">Local ONNX, sqlite-vec, and FTS5</text>
+  <text x="596" y="738" font-family="JetBrainsMono Nerd Font" font-size="36" font-weight="700" fill="var(--foreground)">4.84 ms p50</text>
+  <text x="596" y="776" font-family="Noto Sans" font-size="18" fill="var(--dark-foreground)">Local int8 ONNX, sqlite-vec, FTS5</text>
 
   <!-- Column 3: shard -->
   <line x1="1044" y1="658" x2="1044" y2="796" stroke="#D3CBB9" stroke-width="1.5"/>
   <text x="1076" y="684" font-family="JetBrainsMono Nerd Font" font-size="18" font-weight="700" fill="var(--accent)">shard</text>
   <text x="1076" y="738" font-family="JetBrainsMono Nerd Font" font-size="36" font-weight="700" fill="var(--foreground)">98.5% dedup</text>
-  <text x="1076" y="776" font-family="Noto Sans" font-size="18" fill="var(--dark-foreground)">Rabin CDC on 256 MiB weight shifts</text>
+  <text x="1076" y="776" font-family="Noto Sans" font-size="18" fill="var(--dark-foreground)">FastCDC on 256 MiB offset shifts</text>
 
   <!-- Bottom rule -->
   <line x1="96" y1="828" x2="1504" y2="828" stroke="#D3CBB9" stroke-width="1.5"/>

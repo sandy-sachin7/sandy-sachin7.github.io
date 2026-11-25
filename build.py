@@ -435,10 +435,10 @@ def build_home(posts: list[Post]) -> str:
           <div class="tool-row">
             <div>
               <h3 class="tool-name"><a href="https://github.com/sandy-sachin7/deltalens">deltalens</a></h3>
-              <div class="tool-ver">Rust / v2.0.1 / MIT</div>
+              <div class="tool-ver">Rust / v2.1.0 / MIT</div>
             </div>
             <div>
-              <p class="tool-desc">Read-only CLI and library to inspect, diff, trace, and CI-gate Delta Lake tables directly from _delta_log/ across local disk, S3, GCS, and Azure ADLS.</p>
+              <p class="tool-desc">Read-only CLI and library to inspect, diff, trace, and CI-gate Delta Lake tables directly from _delta_log/ across local disk, S3, GCS, and Azure ADLS, with delta-rs differential conformance tests and strict reader feature checks.</p>
               <div class="tool-links">
                 <a href="https://github.com/sandy-sachin7/deltalens">Source</a>
                 <a href="https://sandy-sachin7.github.io/deltalens/">Benchmarks</a>
@@ -451,33 +451,33 @@ def build_home(posts: list[Post]) -> str:
           <div class="tool-row">
             <div>
               <h3 class="tool-name"><a href="https://github.com/sandy-sachin7/contextd">contextd</a></h3>
-              <div class="tool-ver">Rust / v4.0.2 / MIT</div>
+              <div class="tool-ver">Rust / v4.1.0 / MIT</div>
             </div>
             <div>
-              <p class="tool-desc">Local-first semantic search and MCP daemon using Tree-sitter AST chunking, ONNX Runtime embeddings, and SQLite WAL (sqlite-vec plus FTS5) with loopback hardening.</p>
+              <p class="tool-desc">Local-first semantic search and MCP daemon using Tree-sitter AST chunking, int8 or FP32 ONNX Runtime embeddings, and SQLite WAL (sqlite-vec plus FTS5) with loopback hardening and atomic index rollback.</p>
               <div class="tool-links">
                 <a href="https://github.com/sandy-sachin7/contextd">Source</a>
                 <a href="https://sandy-sachin7.github.io/contextd/">Docs</a>
                 <a href="https://crates.io/crates/contextd">Crates.io</a>
               </div>
             </div>
-            <div class="tool-metric">6.44 ms p50 hybrid query<br>7.74 ms p95 (ONNX + KNN + FTS5)</div>
+            <div class="tool-metric">4.84 ms p50 hybrid query (int8)<br>33.99 s repo index / 1.000 R@10</div>
           </div>
 
           <div class="tool-row">
             <div>
               <h3 class="tool-name"><a href="https://github.com/sandy-sachin7/shard">shard</a></h3>
-              <div class="tool-ver">Rust + PyO3 / v2.4.1 / MIT</div>
+              <div class="tool-ver">Rust + PyO3 / v2.5.0 / MIT</div>
             </div>
             <div>
-              <p class="tool-desc">Content-addressed, Ed25519-signed version control and libp2p sync for ML artifacts using Rabin content-defined chunking, Blake3, and AES-256-GCM envelopes.</p>
+              <p class="tool-desc">Content-addressed, Ed25519-signed version control and libp2p sync for ML artifacts using FastCDC content-defined chunking, Blake3, AES-256-GCM envelopes, and transactional staged checkout.</p>
               <div class="tool-links">
                 <a href="https://github.com/sandy-sachin7/shard">Source</a>
                 <a href="https://sandy-sachin7.github.io/shard/">Docs</a>
                 <a href="https://pypi.org/project/shard-py/">PyPI</a>
               </div>
             </div>
-            <div class="tool-metric">98.5% Rabin CDC dedup on shifts<br>982 to 1,249 MB/s shard verify</div>
+            <div class="tool-metric">98.5% FastCDC dedup on shifts<br>89.0% on frozen 90% checkpoints</div>
           </div>
         </div>
       </section>

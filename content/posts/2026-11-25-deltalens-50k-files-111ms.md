@@ -108,6 +108,15 @@ Delta operations like `RESTORE` and Deletion Vector updates emit both a `remove`
 
 The `StorageBackend` trait defines only read, list, exists, and stat operations. On Linux and macOS, `LocalStorage` pins the table root via `O_DIRECTORY | O_CLOEXEC` and traverses every relative path component with `openat(..., O_NOFOLLOW)`. V2 checkpoint `_sidecars/` references and cloud keys reject `..`, backslashes, and prefix escapes.
 
+## What shipped in v2.1.0: conformance, fuzzing, and live S3 CI
+
+Fast metadata replay only helps if the replay matches the Delta Lake specification on edge cases. Release `v2.1.0` adds protocol checks and conformance suites on top of the `v2.0.1` benchmarked core:
+
+- **Differential conformance against delta-rs.** [scripts/diff_test.py](https://github.com/sandy-sachin7/deltalens/blob/main/scripts/diff_test.py) generates real tables with `deltalake` across four scenarios (Parquet checkpoints, schema evolution, DELETE/UPDATE/MERGE/OPTIMIZE/VACUUM, nested column-mapped schemas, and Deletion Vectors) and checks every active file path, size, row count, and schema against `deltalens inspect --json`.
+- **Fail-loudly reader protocol checks.** Any table requiring `minReaderVersion > 3` or an unsupported `readerFeatures` entry (such as `catalogManaged`) returns `DeltaLensError::UnsupportedProtocol` instead of silently misreading log state.
+- **Spec-compliant typeWidening rules.** Schema diffing now treats `date` to `timestamp` as breaking, permits `date` to `timestamp_ntz`, allows integer-to-double and bounded integer-to-decimal widenings (`byte`, `short`, `integer`, `long` to `decimal(p, s)` with integral digits at least `3`, `5`, `10`, and `19`), and allows scale-preserving decimal widening.
+- **Parser fuzzing and live S3 HTTP CI.** Four `cargo-fuzz` targets under `fuzz/` exercise NDJSON actions, schema JSON, table paths, and V2 sidecar parsing. Integration tests in `tests/cloud_s3.rs` run in GitHub Actions against an ephemeral Moto S3 HTTP server via `scripts/run_s3_test.py`.
+
 ## Wiring it into CI in five lines
 
 DeltaLens ships a composite GitHub Action with SHA-256 binary verification. Breaking schema changes (column removal, Column Mapping renames, narrowing type conversions, or tightened nullability) exit with code `2` and post a report to `$GITHUB_STEP_SUMMARY`.
@@ -120,4 +129,4 @@ DeltaLens ships a composite GitHub Action with SHA-256 binary verification. Brea
     args: --v1 ${{ env.PREV_VER }} --v2 ${{ env.CURR_VER }} --fail-on-breaking
 ```
 
-Install the standalone binary with `cargo install deltalens` (or `--no-default-features` for a pure-local build with zero HTTP dependencies).
+Install `v2.1.0` with `cargo install deltalens` (or `--no-default-features` for a pure-local build with zero HTTP dependencies).

@@ -3,14 +3,14 @@ title: "How one unbounded ONNX batch pushed our local MCP daemon to 2.25 GB RAM"
 slug: "contextd-onnx-batch-memory-spike"
 date: "2026-11-25"
 tags: "Rust, Local AI, Benchmarks"
-summary: "Micro-benchmarks on 100 synthetic chunks hid a 2.25 GB RAM spike and a 16.5-second query stall in contextd. Here is how an end-to-end codebase benchmark caught it, and the 12-line micro-batch fix."
-read_time: "5 min"
-metric: "2.25 GB -> 1.18 GB"
-metric_note: "Peak indexing RSS cut nearly in half, with steady-state hybrid queries landing at 6.44 ms p50 and 7.74 ms p95."
+summary: "Micro-benchmarks on 100 synthetic chunks hid a 2.25 GB RAM spike and a 16.5-second query stall in contextd. Here is how an end-to-end codebase benchmark caught it, the micro-batch fix, and the v4.1.0 int8 and retrieval eval numbers."
+read_time: "6 min"
+metric: "2.25 GB -> 989 MB"
+metric_note: "Peak indexing RSS dropped from 2,246.1 MB to 988.7 MB in v4.1.0 (int8), with initial repo indexing down to 33.99 s and steady-state hybrid queries at 4.84 ms p50."
 repo_url: "https://github.com/sandy-sachin7/contextd"
 featured: "false"
 poster: "/assets/contextd-poster.png"
-poster_alt: "contextd v4.0.2 benchmark plate: ONNX micro-batching at 16 chunks drops peak indexing RSS from 2,246.1 MB to 1,177.6 MB, with warm hybrid queries at 6.44 ms p50 and 7.74 ms p95."
+poster_alt: "contextd v4.1.0 benchmark plate: length-sorted 16-chunk micro-batching and int8 ONNX drop peak indexing RSS from 2,246.1 MB to 988.7 MB, with warm hybrid queries at 4.84 ms p50 and 5.69 ms p95."
 ---
 
 Criterion micro-benchmarks lie when they only measure small synthetic inputs.
@@ -68,13 +68,46 @@ Measured on Linux x86_64 (AMD Ryzen 5 5600H, 12 logical CPUs) indexing `contextd
 | Cold CLI query (`contextd query`) median | 184.7 ms | **190.8 ms** |
 | SQLite index size (`contextd.db`) | 5.8 MB | **5.0 MB** (9.8 MB incl. WAL) |
 
-## Bonus bug caught by the same script
+## Bonus bug caught by the same script (fixed in v4.1.0)
 
-Inspecting the actual top-3 retrieval hits in `bench_repo.py` caught a second real bug that unit tests never noticed. Querying `"tree sitter AST splitting for Rust and Python"` returned `Cargo.lock` in positions 1 and 3 ahead of `src/indexer/chunker.rs`, because package lockfiles were not excluded by default. That is now tracked in [contextd#25](https://github.com/sandy-sachin7/contextd/issues/25).
+Inspecting the actual top-3 retrieval hits in `bench_repo.py` caught a second bug that unit tests missed. Querying `"tree sitter AST splitting for Rust and Python"` returned `Cargo.lock` in positions 1 and 3 ahead of `src/indexer/chunker.rs`, because package lockfiles were not excluded by default. Release `v4.1.0` fixes [contextd#25](https://github.com/sandy-sachin7/contextd/issues/25) by excluding common lockfiles (`Cargo.lock`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `poetry.lock`, `uv.lock`, `go.sum`, and `Gemfile.lock`) in `src/indexer/ignore.rs`.
 
-Reproduce on any repository:
+## v4.1.0 update: length-sorted batching, int8 weights, and retrieval eval
+
+Micro-batching in `v4.0.2` fixed the RAM spike and query stalls, while full-repo indexing still took `65.14 s` on FP32 weights. Release `v4.1.0` adds four changes to indexing and reliability:
+
+- **Length-sorted cross-file micro-batches.** Initial repository scans group up to 128 chunks across small files, sort each batch by character length so similarly sized chunks share padding, and run up to 8 ONNX intra-op CPU threads.
+- **SHA-256 pinned int8 model.** `all-minilm-l6-v2-q8` (`~22 MB`, pinned to `Xenova/all-MiniLM-L6-v2` commit `751bff37182d3f1213fa05d7196b954e230abad9`) is available alongside FP32.
+- **Last-known-good index preservation.** Transient failures during file reads, external parser subprocesses (which run with timeouts and output caps), embedding, or SQLite commits leave existing indexed chunks intact instead of pruning the file.
+- **Explicit search modes.** `POST /query` and `contextd query` expose `--mode hybrid|vector|fts` and `--json`, alongside FTS5 stopword filtering and rebalanced RRF (`0.85 * norm_rrf + 0.15 * vsim`).
+
+Measured on the same AMD Ryzen 5 5600H machine (`v4.1.0` FP32 alone cut initial indexing from `65.14 s` to `39.22 s` before int8 brought it to `33.99 s`):
+
+| Metric | v4.0.2 (`all-minilm-l6-v2`, FP32) | v4.1.0 (`all-minilm-l6-v2-q8`, int8) |
+| :--- | :--- | :--- |
+| Initial full-repo index time | 65.14 s | **33.99 s** (1.92x faster) |
+| Peak daemon RSS during indexing | 1,177.6 MB | **988.7 MB** |
+| Warm HTTP hybrid query p50 | 6.44 ms | **4.84 ms** (min 3.90 ms) |
+| Warm HTTP hybrid query p95 | 7.74 ms | **5.69 ms** |
+| Cold CLI query median | 190.8 ms | **112.9 ms** (1.69x faster) |
+| SQLite DB size (incl. WAL) | 9.8 MB | **6.5 MB** |
+
+Speed means little without retrieval quality numbers. Release `v4.1.0` checks in an uncontaminated 36-query benchmark ([eval/contextd_queries.json](https://github.com/sandy-sachin7/contextd/blob/main/eval/contextd_queries.json), [scripts/eval_retrieval.py](https://github.com/sandy-sachin7/contextd/blob/main/scripts/eval_retrieval.py)) comparing `contextd` (`all-minilm-l6-v2-q8`) against `ripgrep` across exact-symbol, natural-language semantic, and mixed queries:
+
+| Mode | R@1 | R@5 | R@10 | MRR | nDCG@10 | Semantic MRR | Exact MRR | Mixed MRR |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `ripgrep` | **0.722** | **0.889** | 0.917 | **0.793** | **0.817** | **0.506** | 0.958 | **0.917** |
+| `fts_only` | 0.556 | 0.861 | 0.972 | 0.685 | 0.752 | 0.341 | **1.000** | 0.715 |
+| `vector_only` | 0.389 | 0.833 | 0.889 | 0.571 | 0.629 | 0.378 | 0.779 | 0.556 |
+| `hybrid_rrf` (`recency=0, freq=0`) | 0.472 | 0.861 | **1.000** | 0.649 | 0.719 | 0.433 | 0.958 | 0.555 |
+| `hybrid_default` | 0.556 | 0.806 | 0.972 | 0.676 | 0.736 | 0.379 | **1.000** | 0.647 |
+
+The trade-off shows directly in that table. `hybrid_rrf` hits `1.000` Recall@10 (every expected file appears in the top 10, vs `0.917` for `ripgrep`) and `hybrid_default` hits `1.000` MRR on exact symbols, while `all-minilm-l6-v2-q8` stays within `0.005` MRR of FP32 (`0.676` vs `0.681`). `ripgrep` still leads top-1 MRR (`0.793` vs `0.676`) when `README.md`, `CHANGELOG.md`, and `docs/` are indexed alongside `src/`, because general-text MiniLM scores prose documentation ahead of Rust source chunks. Pass `--paths src/` or `--file-types rs` for code-only queries.
+
+Reproduce both benchmarks on any repository:
 
 ```bash
 cargo build --release --locked
-python3 scripts/bench_repo.py --target .
+python3 scripts/bench_repo.py --target . --model all-minilm-l6-v2-q8
+python3 scripts/eval_retrieval.py --model all-minilm-l6-v2-q8
 ```

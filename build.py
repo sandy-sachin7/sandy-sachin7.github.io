@@ -179,11 +179,16 @@ def render_markdown(md: str) -> str:
             i += 1
             continue
 
-        # Raw HTML block passthrough (for interactive benchmark widgets)
-        if stripped.startswith("<div ") or stripped.startswith("<section "):
+        # Raw HTML block passthrough (for interactive widgets, embeds, and custom figures)
+        if stripped.startswith(("<div ", "<section ", "<figure ")):
             html_lines = [line]
             depth = 1
-            tag = "div" if stripped.startswith("<div ") else "section"
+            if stripped.startswith("<div "):
+                tag = "div"
+            elif stripped.startswith("<section "):
+                tag = "section"
+            else:
+                tag = "figure"
             i += 1
             while i < n and depth > 0:
                 cur = lines[i]
@@ -313,7 +318,7 @@ def render_markdown(md: str) -> str:
         while (
             i < n
             and lines[i].strip()
-            and not lines[i].strip().startswith(("#", "```", ">", "- ", "|", "<div ", "<section ", "!["))
+            and not lines[i].strip().startswith(("#", "```", ">", "- ", "|", "<div ", "<section ", "<figure ", "!["))
             and not re.match(r"^(?:-{3,}|\*{3,}|(?:\*\s+){2,}\*)$", lines[i].strip())
             and not re.match(r"^\d+\.\s+", lines[i].strip())
         ):
@@ -473,17 +478,13 @@ def build_featured_section(featured: Post) -> str:
 def build_home(posts: list[Post]) -> str:
     featured = next((p for p in posts if p.featured), posts[0])
 
-    # Collect kinds first (in deterministic order), then tags, deduplicated case-insensitively
+    # Filter by top-level post kind so the bar stays compact as tags grow
     filter_labels: list[str] = []
     seen_filters: set[str] = set()
     for p in posts:
         if p.kind and p.kind.lower() not in seen_filters:
             seen_filters.add(p.kind.lower())
             filter_labels.append(p.kind)
-    for tag in sorted({t for p in posts for t in p.tags}):
-        if tag.lower() not in seen_filters:
-            seen_filters.add(tag.lower())
-            filter_labels.append(tag)
 
     filter_btns = ['<button type="button" class="filter-btn" data-filter="all" aria-pressed="true">All</button>']
     for label in filter_labels:
@@ -497,7 +498,8 @@ def build_home(posts: list[Post]) -> str:
         num = f"{idx:02d}"
         filter_csv = ",".join(t.lower() for t in p.filter_terms)
         kind_span = f'<span class="essay-kind">{html.escape(p.kind)}</span>' if p.kind else ""
-        tags_spans = "".join(f"<span>#{html.escape(t)}</span>" for t in p.tags)
+        display_tags = [t for t in p.tags if t.lower() != p.kind.lower()]
+        tags_spans = "".join(f"<span>#{html.escape(t)}</span>" for t in display_tags)
         meta_line = f"{html.escape(p.date)}<br>{html.escape(p.read_time)}"
         rows_html.append(
             f'<li class="essay-row" data-tags="{html.escape(filter_csv)}">'
@@ -658,8 +660,10 @@ def build_post_page(post: Post, prev_post: Post | None, next_post: Post | None) 
     if post.kind:
         meta_items.append(f'<span class="meta-kind">{html.escape(post.kind)}</span>')
     if post.tags:
-        tags_html = " ".join(f"<span>#{html.escape(t)}</span>" for t in post.tags)
-        meta_items.append(f"<span>{tags_html}</span>")
+        display_tags = [t for t in post.tags if t.lower() != post.kind.lower()]
+        if display_tags:
+            tags_html = " ".join(f"<span>#{html.escape(t)}</span>" for t in display_tags)
+            meta_items.append(f"<span>{tags_html}</span>")
     if post.repo_url:
         meta_items.append(f'<a href="{html.escape(post.repo_url)}">Repository</a>')
 

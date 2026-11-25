@@ -704,8 +704,7 @@ main {
 
 .prose pre {
   margin: 0;
-  padding: 16px 18px;
-  padding-right: 78px;
+  padding: 46px 18px 16px;
   background: var(--surface-code);
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);

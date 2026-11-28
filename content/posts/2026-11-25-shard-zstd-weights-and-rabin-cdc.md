@@ -80,6 +80,16 @@ If a swap or `HEAD` update fails, rollback restores every replaced file via idem
 
 Six deterministic boundary fault-injection tests in [tests/resilience.rs](https://github.com/sandy-sachin7/shard/blob/main/tests/resilience.rs) exercise failures during backup creation, mid-swap, `HEAD` update, simulated mid-swap crash, simulated `UpdatingHead` crash, and corrupt-backup rollback error propagation. Release `v2.5.2` opens backup files with write access (`OpenOptions::new().write(true)`) before `sync_all()` so Windows `FlushFileBuffers` succeeds without `os error 5`, verified across Linux, macOS, and Windows CI.
 
+## Descriptor-pinned I/O and hard-kill recovery (v2.6.0)
+
+Path-based filesystem checks leave a TOCTOU window if a directory component is swapped for a symlink between validation and open. A journaled checkout also needs integrity checks on the journal file and its backups so bit rot cannot silently restore corrupted weights.
+
+Release `v2.6.0` closes both gaps:
+
+- `PinnedRepoDir` in [core/src/fs_util.rs](https://github.com/sandy-sachin7/shard/blob/main/core/src/fs_util.rs) pins the repository root with `O_DIRECTORY | O_CLOEXEC` on Unix and performs component-by-component `openat(..., O_NOFOLLOW)`, `mkdirat`, `renameat`, `unlinkat`, and `fstatat(..., AT_SYMLINK_NOFOLLOW)` with parent directory `fsync`. Checkout staging, backup, swap, rollback, and cleanup in [core/src/repo.rs](https://github.com/sandy-sachin7/shard/blob/main/core/src/repo.rs) all route through `PinnedRepoDir`.
+- `.shard/checkout_journal.json` now wraps its payload in a versioned CRC32 envelope (`CheckoutJournalEnvelope`) and records `backup_blake3` and `expected_blake3` hashes. Corrupted journals and bit-rotted backups fail loudly instead of silently restoring bad data.
+- Five new tests in [tests/resilience.rs](https://github.com/sandy-sachin7/shard/blob/main/tests/resilience.rs) verify CRC32 journal tampering, backup Blake3 bit-rot detection, real OS child-process hard kills (`std::process::exit(137)`, zero `Drop` destructors) for both mid-swap rollback and pre-`HEAD` roll-forward, and Unix `O_NOFOLLOW` rejection of symlinked directories and leaf files.
+
 Run both benchmark scripts on your own disk:
 
 ```bash

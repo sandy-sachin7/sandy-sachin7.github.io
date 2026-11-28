@@ -127,6 +127,15 @@ Comparing against `delta-rs` alone leaves open whether a parser matches tables w
 - **Continuous parser fuzzing in CI.** Checked-in seed corpora under `fuzz/corpus/` drive all four targets (`commit_ndjson`, `last_checkpoint`, `parquet_checkpoint`, `schema_json`) in [.github/workflows/fuzz.yml](https://github.com/sandy-sachin7/deltalens/blob/main/.github/workflows/fuzz.yml) on a weekly schedule, on parser pull requests, and on manual dispatch.
 - **Opt-in live cloud check.** [.github/workflows/cloud-live.yml](https://github.com/sandy-sachin7/deltalens/blob/main/.github/workflows/cloud-live.yml) runs `deltalens inspect` against live S3, GCS, or Azure ADLS buckets via `workflow_dispatch` when credentials are supplied.
 
+## What shipped in v2.3.1: deep Spark DAT parity and multi-cloud CI
+
+Release `v2.3.1` deepens the Spark DAT assertions and expands cloud CI coverage beyond S3:
+
+- `TableStats` in `src/core/model/stats.rs` and `src/core/analyzer/health.rs` now exposes sorted `table_properties`.
+- [scripts/dat_test.py](https://github.com/sandy-sachin7/deltalens/blob/main/scripts/dat_test.py) checks all 19 Spark DAT tables (29 snapshots and 5 multi-version diffs) for `table_properties`, active file counts, total active bytes, partition columns, full nested schema parity against `delta-rs` and Spark `table_content/*.parquet`, exact net active row counts (`raw_parquet_rows - deleted_rows_in_dvs`), and `deltalens diff` output including `with_schema_change`.
+- End-to-end GCS ([tests/cloud_gcs.rs](https://github.com/sandy-sachin7/deltalens/blob/main/tests/cloud_gcs.rs), [scripts/run_gcs_test.py](https://github.com/sandy-sachin7/deltalens/blob/main/scripts/run_gcs_test.py)) and Azure `az://` plus `abfss://` ([tests/cloud_azure.rs](https://github.com/sandy-sachin7/deltalens/blob/main/tests/cloud_azure.rs)) HTTP integration tests run alongside S3 in [.github/workflows/ci.yml](https://github.com/sandy-sachin7/deltalens/blob/main/.github/workflows/ci.yml).
+- [.github/workflows/cloud-live.yml](https://github.com/sandy-sachin7/deltalens/blob/main/.github/workflows/cloud-live.yml) adds `skip_signature` for public buckets and an optional `diff_v1` input to verify live multi-version diffs.
+
 ## Wiring it into CI in five lines
 
 DeltaLens ships a composite GitHub Action with SHA-256 binary verification. Breaking schema changes (column removal, Column Mapping renames, narrowing type conversions, or tightened nullability) exit with code `2` and post a report to `$GITHUB_STEP_SUMMARY`.
@@ -139,4 +148,4 @@ DeltaLens ships a composite GitHub Action with SHA-256 binary verification. Brea
     args: --v1 ${{ env.PREV_VER }} --v2 ${{ env.CURR_VER }} --fail-on-breaking
 ```
 
-Install `v2.2.0` with `cargo install deltalens` (or `--no-default-features` for a pure-local build with zero HTTP dependencies).
+Install `v2.3.1` with `cargo install deltalens` (or `--no-default-features` for a pure-local build with zero HTTP dependencies).

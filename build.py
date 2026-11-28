@@ -565,10 +565,10 @@ def build_home(posts: list[Post]) -> str:
           <div class="tool-row">
             <div>
               <h3 class="tool-name"><a href="https://github.com/sandy-sachin7/deltalens">deltalens</a></h3>
-              <div class="tool-ver">Rust / v2.2.0 / MIT</div>
+              <div class="tool-ver">Rust / v2.3.1 / MIT</div>
             </div>
             <div>
-              <p class="tool-desc">Read-only CLI and library to inspect, diff, trace, and CI-gate Delta Lake tables directly from _delta_log/ across local disk, S3, GCS, and Azure ADLS, verified against all 19 Apache Spark DAT tables, delta-rs differential tests, and 4 continuous fuzz targets.</p>
+              <p class="tool-desc">Read-only CLI and library to inspect, diff, trace, and CI-gate Delta Lake tables directly from _delta_log/ across local disk, S3, GCS, and Azure ADLS. Verified against all 19 Apache Spark DAT tables (29 snapshots), delta-rs differential tests, S3/GCS/Azure integration CI, and 4 continuous fuzz targets.</p>
               <div class="tool-links">
                 <a href="https://github.com/sandy-sachin7/deltalens">Source</a>
                 <a href="https://sandy-sachin7.github.io/deltalens/">Benchmarks</a>
@@ -581,26 +581,26 @@ def build_home(posts: list[Post]) -> str:
           <div class="tool-row">
             <div>
               <h3 class="tool-name"><a href="https://github.com/sandy-sachin7/contextd">contextd</a></h3>
-              <div class="tool-ver">Rust / v4.2.0 / MIT</div>
+              <div class="tool-ver">Rust / v4.3.0 / MIT</div>
             </div>
             <div>
-              <p class="tool-desc">Local-first semantic search and MCP daemon using method-level Tree-sitter AST chunking, path-contextualized int8 or FP32 ONNX embeddings, and Stage-2 hybrid reranking over SQLite WAL (sqlite-vec plus FTS5) with loopback hardening.</p>
+              <p class="tool-desc">Local-first semantic search and MCP daemon using method-level Tree-sitter AST chunking, path-contextualized int8 or FP32 ONNX embeddings, and Stage-2 hybrid reranking over SQLite WAL (sqlite-vec plus FTS5) with loopback hardening and CI retrieval regression gates.</p>
               <div class="tool-links">
                 <a href="https://github.com/sandy-sachin7/contextd">Source</a>
                 <a href="https://sandy-sachin7.github.io/contextd/">Docs</a>
                 <a href="https://crates.io/crates/contextd">Crates.io</a>
               </div>
             </div>
-            <div class="tool-metric">0.884 MRR / 0.896 nDCG@10 (72q)<br>4.84 ms p50 query / 989 MB RSS</div>
+            <div class="tool-metric">0.823 MRR / 1.000 R@5 (54q external)<br>4.84 ms p50 query / 989 MB RSS</div>
           </div>
 
           <div class="tool-row">
             <div>
               <h3 class="tool-name"><a href="https://github.com/sandy-sachin7/shard">shard</a></h3>
-              <div class="tool-ver">Rust + PyO3 / v2.5.2 / MIT</div>
+              <div class="tool-ver">Rust + PyO3 / v2.6.0 / MIT</div>
             </div>
             <div>
-              <p class="tool-desc">Content-addressed, Ed25519-signed version control and libp2p sync for ML artifacts using FastCDC content-defined chunking, Blake3, AES-256-GCM envelopes, and a durable crash-atomic checkout journal with automatic recovery.</p>
+              <p class="tool-desc">Content-addressed, Ed25519-signed version control and libp2p sync for ML artifacts using FastCDC content-defined chunking, Blake3, AES-256-GCM envelopes, descriptor-pinned openat/O_NOFOLLOW I/O, and a CRC32-verified crash-atomic checkout journal.</p>
               <div class="tool-links">
                 <a href="https://github.com/sandy-sachin7/shard">Source</a>
                 <a href="https://sandy-sachin7.github.io/shard/">Docs</a>

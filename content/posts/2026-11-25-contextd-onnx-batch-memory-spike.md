@@ -4,10 +4,10 @@ slug: "contextd-onnx-batch-memory-spike"
 date: "2026-11-25"
 kind: "Engineering"
 tags: "Rust, Local AI, Benchmarks"
-summary: "Micro-benchmarks on 100 synthetic chunks hid a 2.25 GB RAM spike and a 16.5-second query stall in contextd. Here is how an end-to-end codebase benchmark caught it, the micro-batch fix, the v4.1.0 int8 numbers, and the v4.2.0 retrieval changes that beat ripgrep across 72 queries in 3 repos."
-read_time: "7 min"
+summary: "Micro-benchmarks on 100 synthetic chunks hid a 2.25 GB RAM spike and a 16.5-second query stall in contextd. Here is how an end-to-end codebase benchmark caught it, the micro-batch fix, the v4.1.0 int8 numbers, the v4.2.0 hybrid ranking overhaul, and the v4.3.0 external Rust/Python/TypeScript eval."
+read_time: "8 min"
 metric: "2.25 GB -> 989 MB"
-metric_note: "Peak indexing RSS dropped from 2,246.1 MB to 988.7 MB in v4.1.0 (int8), warm queries run at 4.84 ms p50, and v4.2.0 hybrid retrieval reaches 0.884 MRR and 0.896 nDCG@10 across 72 queries in 3 repos (vs 0.750 / 0.786 for ripgrep)."
+metric_note: "Peak indexing RSS dropped from 2,246.1 MB to 988.7 MB (int8), warm queries run at 4.84 ms p50, and v4.3.0 hybrid retrieval scores 0.823 MRR, 0.860 nDCG@10, and 1.000 R@5 across 54 external queries in fd, httpx, and zustand (vs 0.443 / 0.512 for ripgrep)."
 repo_url: "https://github.com/sandy-sachin7/contextd"
 featured: "false"
 poster: "/assets/contextd-poster.png"
@@ -132,10 +132,26 @@ To make sure those changes did not overfit `contextd`, `v4.2.0` adds uncontamina
 
 Across all 72 queries, `hybrid_default` beats `ripgrep`, `fts_only`, and `vector_only` on every repository. On natural-language semantic queries specifically, weighted average Semantic MRR rises from `0.560` (`ripgrep`) to `0.838` (`hybrid_default`), hitting `1.000` Semantic MRR on both unseen repositories.
 
-Reproduce both benchmarks on any repository:
+## v4.3.0 update: independent 3-language evaluation and CI quality gates
+
+Evaluating only on your own Rust repositories still leaves room for language bias. Release `v4.3.0` adds 54 uncontaminated queries across three third-party open-source repositories pinned to immutable commit SHAs in [eval/external_repos.json](https://github.com/sandy-sachin7/contextd/blob/main/eval/external_repos.json), executed by [scripts/eval_external.py](https://github.com/sandy-sachin7/contextd/blob/main/scripts/eval_external.py) with raw output checked in as [eval/results-external-summary-q8.json](https://github.com/sandy-sachin7/contextd/blob/main/eval/results-external-summary-q8.json).
+
+Measured with `all-minilm-l6-v2-q8` and zero per-repo tuning:
+
+| Third-party repo (language) | `ripgrep` MRR / nDCG@10 | `fts_only` MRR / nDCG@10 | `vector_only` MRR / nDCG@10 | `hybrid_default` MRR / nDCG@10 / R@5 |
+| :--- | :--- | :--- | :--- | :--- |
+| `sharkdp/fd` (Rust, 18 queries) | 0.547 / 0.624 | 0.718 / 0.765 | 0.766 / 0.797 | **0.795 / 0.823 / 1.000** |
+| `encode/httpx` (Python, 18 queries) | 0.484 / 0.553 | 0.582 / 0.653 | 0.598 / 0.677 | **0.821 / 0.866 / 1.000** |
+| `pmndrs/zustand` (TypeScript, 18 queries) | 0.298 / 0.359 | 0.543 / 0.655 | 0.452 / 0.574 | **0.852 / 0.890 / 1.000** |
+| **Weighted average (54 queries)** | **0.443 / 0.512** | **0.614 / 0.691** | **0.605 / 0.683** | **0.823 / 0.860 / 1.000** |
+
+To stop retrieval regressions from slipping into `main`, `scripts/eval_retrieval.py` now supports `--auto-setup`, `--min-mrr`, `--min-ndcg`, `--min-semantic-mrr`, and `--require-beat-ripgrep`. Every push and pull request runs the `Retrieval Quality Gate (Q8)` job in [.github/workflows/ci.yml](https://github.com/sandy-sachin7/contextd/blob/main/.github/workflows/ci.yml), and [.github/workflows/external-eval.yml](https://github.com/sandy-sachin7/contextd/blob/main/.github/workflows/external-eval.yml) runs the three-language external suite on a weekly schedule and on manual dispatch.
+
+Reproduce the local and external benchmarks on any machine:
 
 ```bash
 cargo build --release --locked
 python3 scripts/bench_repo.py --target . --model all-minilm-l6-v2-q8
-python3 scripts/eval_retrieval.py --model all-minilm-l6-v2-q8
+python3 scripts/eval_retrieval.py --model all-minilm-l6-v2-q8 --auto-setup --require-beat-ripgrep
+python3 scripts/eval_external.py --model all-minilm-l6-v2-q8
 ```
